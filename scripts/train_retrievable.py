@@ -210,6 +210,8 @@ def main() -> None:
         raise RuntimeError("CUDA required.")
 
     torch.cuda.reset_peak_memory_stats()
+    
+    tqdm.write(f"Cache dir: {args.cache_dir}\n")
 
     print_section("Data Preparation")
     train_records = prepare_records(args.dataset, args.cache_dir, args.max_train_samples, "train")
