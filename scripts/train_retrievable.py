@@ -36,7 +36,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--model-id", default=DEFAULT_MODEL)
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--image-root", type=Path, required=True)
-    parser.add_argument("--cache-dir", type=Path, default=ROOT / "artifacts/cache")
+    parser.add_argument("--cache-dir", type=Path, default= "/marimo/cache/train")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--max-train-samples", type=int, default=-1)
     parser.add_argument("--num-val-samples", type=int, default=500, help="Samples to eval per epoch for checkpoint selection.")
