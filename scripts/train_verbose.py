@@ -14,7 +14,6 @@ sys.path.insert(0, str(ROOT))
 
 DEFAULT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
 
-
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-id", default=DEFAULT_MODEL)
@@ -229,14 +228,14 @@ def main() -> None:
                     val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
                     tqdm.write(f"{prefix}{formatted_k}: {val_str}")
             if indent == 1:
-                tqdm.write()
+                tqdm.write("")
                 
         def print_non_nested(data):
             for k, v in data.items():
                 formatted_k = k.replace("_", " ").title()
                 val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
                 tqdm.write(f"{formatted_k}: {val_str}")
-            tqdm.write()        
+            tqdm.write("")        
 
         print_non_nested(all_val_ans)
         # print_nested(all_val_ans)
