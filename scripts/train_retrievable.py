@@ -97,9 +97,7 @@ def push_to_huggingface(
         return f"https://huggingface.co/{repo_id}"
     
     except Exception as e:
-        print(f"Error uploading to Hugging Face Hub: {e}")
-        return None
-
+        return f"[ERROR] uploading to Hugging Face Hub: {e}"
 
 def print_section(title: str) -> None:
     tqdm.write(f"\n{'=' * 65}\n{title.upper()}\n{'=' * 65}")
@@ -424,7 +422,7 @@ def main() -> None:
                             
                         os.makedirs(f"{args.output_dir}/last_push_urls", exist_ok=True)
                         with open(f"{args.output_dir}/last_push_urls/last_push_url_{datetime.now()}.txt".replace(" ", ""), "w", encoding="utf-8") as f:
-                            f.write(url)
+                            f.write(str(url))
 
                     if step >= args.max_train_steps:
                         break
