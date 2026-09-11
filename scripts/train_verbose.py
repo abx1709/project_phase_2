@@ -240,6 +240,8 @@ def main() -> None:
                 
         def print_non_nested(data):
             for k, v in data.items():
+                if isinstance(v, dict):
+                    continue  # Skip nested dictionaries for non-nested printing
                 formatted_k = k.replace("_", " ").title()
                 val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
                 tqdm.write(f"{formatted_k}: {val_str}")
