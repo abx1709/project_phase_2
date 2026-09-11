@@ -7,6 +7,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from tqdm import tqdm
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -57,7 +58,8 @@ def evaluate_model(model, processor, records, image_root, allow_missing, device)
     results = []
     
     with torch.inference_mode():
-        for item in records:
+        val_pbar = tqdm(records, desc="Validating", leave=False)
+        for item in val_pbar:
             try:
                 img_path = Path(image_root) / item["image"]
                 image = Image.open(img_path).convert("RGB")
@@ -134,7 +136,8 @@ def main() -> None:
 
     for epoch in range(args.num_train_epochs):
         print(f"--- Epoch {epoch + 1}/{args.num_train_epochs} ---")
-        for batch_index, batch in enumerate(loader):
+        train_loader = tqdm(loader, desc=f"Training Epoch {epoch + 1}")
+        for batch_index, batch in enumerate(train_loader):
             batch = move_to_model_device(batch, model)
             with torch.autocast("cuda", dtype=compute_dtype):
                 loss = model(**batch).loss / args.gradient_accumulation_steps

@@ -7,6 +7,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from tqdm import tqdm
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -24,6 +25,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--max-samples", type=int, default=-1)
     parser.add_argument("--allow-missing-images", action="store_true")
     parser.add_argument("--fp16", action="store_true")
+    parser.add_argument("--num-eval-samples", type=int, default=-1)
+    
     return parser.parse_args()
 
 
@@ -50,8 +53,7 @@ def main() -> None:
     torch.cuda.reset_peak_memory_stats()
 
     # Load split-aware records
-    all_records = prepare_records(args.dataset, args.cache_dir, -1, "all")
-    records = [r for r in all_records if r.get("split") == args.split]
+    records = prepare_records(args.dataset, args.cache_dir, args.num_eval_samples, split=args.split)
     
     if args.max_samples > 0:
         records = records[: args.max_samples]
@@ -69,7 +71,8 @@ def main() -> None:
     results = []
 
     with torch.inference_mode():
-        for item in records:
+        eval_pbar = tqdm(records, desc=f"Evaluating {args.split}")
+        for item in eval_pbar:
             image = load_image(args.image_root / item["image"], args.allow_missing_images)
             conv = build_conversation(item["question"], target=None)
             prompt = processor.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
