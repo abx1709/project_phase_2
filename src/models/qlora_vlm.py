@@ -72,10 +72,13 @@ def load_quantized_vlm(
             if hasattr(model, "gradient_checkpointing_enable"):
                 model.gradient_checkpointing_enable()
             
+            # EXPERIMENT B: Target LM layers AND the Visual Merger explicitly.
+            # "merger.mlp.0" and "merger.mlp.2" are the linear layers inside Qwen2-VL's visual.merger.
+            # This leaves the Vision Tower (ViT) completely frozen.
             target_modules = [
                 "q_proj", "v_proj", "k_proj", "o_proj", 
                 "gate_proj", "up_proj", "down_proj",
-                "fc1", "fc2"  # EXPERIMENT B: Visual Merger & ViT MLPs
+                "merger.mlp.0", "merger.mlp.2" 
             ]
             peft_config = LoraConfig(
                 r=8,
