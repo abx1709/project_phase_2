@@ -126,8 +126,9 @@ class LlavaDataCollator:
             user_text = self.processor.apply_chat_template(
                 user_conv, tokenize=False, add_generation_prompt=True
             )
-            user_ids = self.processor.tokenizer(user_text, add_special_tokens=True)["input_ids"]
-            user_len = len(user_ids)
+            
+            user_inputs = self.processor(text=[user_text], images=[ex["image_data"]], return_tensors="pt")
+            user_len = user_inputs["input_ids"].shape[-1]
             labels[i, :user_len] = -100
 
         batch["labels"] = labels
