@@ -48,7 +48,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--use-4bit", action="store_true")
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--seed", type=int, default=0, help="Base seed for per-epoch shuffle (must stay fixed across resumes).")
-    parser.add_argument("--resume-every", type=int, default=100, help="Optimizer steps between resume saves (kill loses at most this many).")
+    parser.add_argument("--resume-every", type=int, default=13, help="Optimizer steps between resume saves (kill loses at most this many).")
     parser.add_argument("--fresh", action="store_true", help="Ignore cached resume state and start over.")
     return parser.parse_args()
 
