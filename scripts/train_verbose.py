@@ -22,7 +22,6 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--image-root", type=Path, required=True)
     parser.add_argument("--cache-dir", type=Path, default=ROOT / "artifacts/cache")
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--split", default="train", choices=["train", "val", "test"])
     parser.add_argument("--max-train-samples", type=int, default=-1)
     parser.add_argument("--num-val-samples", type=int, default=500, help="Samples to eval per epoch for checkpoint selection.")
     parser.add_argument("--num-train-epochs", type=int, default=3)
@@ -158,7 +157,7 @@ def main() -> None:
     torch.cuda.reset_peak_memory_stats()
 
     print_section("Data Preparation")
-    train_records = prepare_records(args.dataset, args.cache_dir, args.max_train_samples, args.split)
+    train_records = prepare_records(args.dataset, args.cache_dir, args.max_train_samples, "train")
     val_records = prepare_records(args.dataset, args.cache_dir, args.num_val_samples, "val")
     
     if not train_records:
@@ -187,7 +186,7 @@ def main() -> None:
 
     print_section("Training Loop Started")
     model.train()
-    best_val_ans = 0.0
+    best_val_ans = -1.0
     step = 0
     losses = []
     started = time.perf_counter()
@@ -215,9 +214,10 @@ def main() -> None:
                     
         # --- VALIDATION & CHECKPOINTING ---
         print("Running validation...")
-        val_ans = evaluate_model(model, processor, val_records, args.image_root, args.allow_missing_images, next(model.parameters()).device)
+        all_val_ans = evaluate_model(model, processor, val_records, args.image_root, args.allow_missing_images, next(model.parameters()).device)
+        val_ans = all_val_ans["overall_ans"]
         print(f"Epoch {epoch+1} Validation")
-        for k, v in val_ans.items():
+        for k, v in all_val_ans.items():
             k = k.replace("_", " ").title()
             print(f"{k}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}")
         
