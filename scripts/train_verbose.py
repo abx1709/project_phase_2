@@ -158,7 +158,9 @@ def main() -> None:
 
     print_section("Data Preparation")
     train_records = prepare_records(args.dataset, args.cache_dir, args.max_train_samples, "train")
+    tqdm.write(f"Loaded {len(train_records)} training records.")
     val_records = prepare_records(args.dataset, args.cache_dir, args.num_val_samples, "val")
+    tqdm.write(f"Loaded {len(val_records)} validation records.")
     
     if not train_records:
         raise ValueError("No training records found.")
