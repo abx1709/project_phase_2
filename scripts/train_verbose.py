@@ -140,7 +140,8 @@ def evaluate_model(model, processor, records, image_root, allow_missing, device)
 
     metrics = compute_all_metrics(results)
 
-    return metrics["overall_ans"]
+    # return metrics["overall_ans"]
+    return metrics
 
 def main() -> None:
     args = arguments()
@@ -215,7 +216,10 @@ def main() -> None:
         # --- VALIDATION & CHECKPOINTING ---
         print("Running validation...")
         val_ans = evaluate_model(model, processor, val_records, args.image_root, args.allow_missing_images, next(model.parameters()).device)
-        print(f"Epoch {epoch+1} Validation ANS: {val_ans:.4f}")
+        print(f"Epoch {epoch+1} Validation")
+        for k, v in val_ans.items():
+            k = k.replace("_", " ").title()
+            print(f"{k}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}")
         
         if val_ans > best_val_ans:
             best_val_ans = val_ans
