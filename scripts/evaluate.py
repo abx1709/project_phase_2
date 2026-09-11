@@ -9,6 +9,13 @@ import time
 from pathlib import Path
 from tqdm import tqdm
 
+# Pretty printing & visualization imports
+from rich.console import Console
+from rich.table import Table
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -46,7 +53,7 @@ def main() -> None:
     args = arguments()
     import torch
     from src.data.vizwiz import build_conversation, prepare_records
-    from src.evaluation import vizwiz_ans, compute_all_metrics
+    from src.evaluation import vizwiz_ans, compute_all_metrics, infer_answer_type
     from src.models.qlora_vlm import QLoRASettings, load_quantized_vlm
 
     started = time.perf_counter()
@@ -115,20 +122,23 @@ def main() -> None:
     eval_file = args.output_dir / "final_evaluation.json"
     eval_file.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"\nEVALUATION COMPLETE ({args.split})")
-    print(f"Samples: {len(results)}")
-    print(f"Overall ANS: {metrics['overall_ans']:.4f}")
-    print(f"Type Accuracy: {metrics['type_accuracy']:.4f}")
-    print(f"Macro F1: {metrics['type_macro_f1']:.4f}")
-    print(f"Latency (ms/query): {latency_per_query_ms:.2f}")
-    print(f"Peak VRAM (GiB): {peak_vram_gib:.3f}")
+    # --- Rich Console Summary & Tables ---
+    console = Console()
+    console.print(f"\n[bold cyan]EVALUATION COMPLETE ({args.split})[/bold cyan]")
+    console.print(f"Samples: [yellow]{len(results)}[/yellow]")
+    console.print(f"Overall ANS: [green]{metrics['overall_ans']:.4f}[/green]")
+    console.print(f"Type Accuracy: [green]{metrics['type_accuracy']:.4f}[/green]")
+    console.print(f"Macro F1: [green]{metrics['type_macro_f1']:.4f}[/green]")
+    console.print(f"Latency (ms/query): [yellow]{latency_per_query_ms:.2f}[/yellow]")
+    console.print(f"Peak VRAM (GiB): [yellow]{peak_vram_gib:.3f}[/yellow]\n")
 
-    # --- 1. Per-Class Metrics Table ---
-    print("\n" + "=" * 78)
-    print(f"{'PER-CLASS METRICS BREAKDOWN':^78}")
-    print("=" * 78)
-    print(f"{'Answer Type':<18} | {'ANS Score':<10} | {'Precision':<10} | {'Recall':<10} | {'F1-Score':<10}")
-    print("-" * 78)
+    # 1. Per-Class Metrics Table
+    metrics_table = Table(title="Per-Class Metrics Breakdown", show_header=True, header_style="bold magenta")
+    metrics_table.add_column("Answer Type", style="cyan", width=18)
+    metrics_table.add_column("ANS Score", justify="right")
+    metrics_table.add_column("Precision", justify="right")
+    metrics_table.add_column("Recall", justify="right")
+    metrics_table.add_column("F1-Score", justify="right")
 
     per_class_ans = metrics.get("per_class_ans", {})
     per_class_prf = metrics.get("per_class_type_metrics", {})
@@ -137,36 +147,53 @@ def main() -> None:
     for cls in all_classes:
         ans_score = per_class_ans.get(cls, 0.0)
         prf = per_class_prf.get(cls, {"precision": 0.0, "recall": 0.0, "f1": 0.0})
-        p = prf.get("precision", 0.0)
-        r = prf.get("recall", 0.0)
-        f1 = prf.get("f1", 0.0)
-        print(f"{cls:<18} | {ans_score:<10.4f} | {p:<10.4f} | {r:<10.4f} | {f1:<10.4f}")
-    print("=" * 78)
+        metrics_table.add_row(
+            cls,
+            f"{ans_score:.4f}",
+            f"{prf.get('precision', 0.0):.4f}",
+            f"{prf.get('recall', 0.0):.4f}",
+            f"{prf.get('f1', 0.0):.4f}"
+        )
+    console.print(metrics_table)
+    console.print()
 
-    # --- 2. Confusion Matrix ---
-    from sklearn.metrics import confusion_matrix
-    from src.evaluation import infer_answer_type
-
+    # 2. Confusion Matrix Table
     y_true = [r["answer_type"] for r in results]
     y_pred = [infer_answer_type(r["prediction"]) for r in results]
     labels = sorted(list(set(y_true + y_pred)))
     cm = confusion_matrix(y_true, y_pred, labels=labels)
 
-    print("\n" + "=" * 78)
-    print(f"{'CONFUSION MATRIX (Rows: True, Columns: Predicted)':^78}")
-    print("=" * 78)
-    
-    # Print header row with label abbreviations or truncated names
-    col_width = 12
-    header_lbls = [l[:col_width] for l in labels]
-    header = f"{'True \\ Pred':<18} | " + " | ".join([f"{l:<{col_width}}" for l in header_lbls])
-    print(header)
-    print("-" * len(header))
+    cm_table = Table(title="Confusion Matrix (Rows: True, Cols: Pred)", show_header=True, header_style="bold green")
+    cm_table.add_column("True \\ Pred", style="yellow")
+    for label in labels:
+        cm_table.add_column(label, justify="right")
 
     for i, label in enumerate(labels):
-        row_values = " | ".join([f"{val:<{col_width}}" for val in cm[i]])
-        print(f"{label:<18} | {row_values}")
-    print("=" * 78)
+        row_vals = [str(val) for val in cm[i]]
+        cm_table.add_row(label, *row_vals)
+    console.print(cm_table)
+
+    # 3. Generate & Save Confusion Matrix Heatmap Image
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(
+        cm, 
+        annot=True, 
+        fmt="d", 
+        cmap="Blues", 
+        xticklabels=labels, 
+        yticklabels=labels,
+        cbar=True
+    )
+    plt.title(f"Confusion Matrix Heatmap ({args.split} split)", fontsize=14, fontweight="bold", pad=12)
+    plt.xlabel("Predicted Answer Type", fontsize=11, labelpad=10)
+    plt.ylabel("True Answer Type", fontsize=11, labelpad=10)
+    plt.tight_layout()
+
+    cm_image_path = args.output_dir / "confusion_matrix.png"
+    plt.savefig(cm_image_path, dpi=300)
+    plt.close()
+    
+    console.print(f"\n[bold green]Saved confusion matrix image to:[/bold green] [underline]{cm_image_path.resolve()}[/underline]\n")
 
 if __name__ == "__main__":
     main()
