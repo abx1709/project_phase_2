@@ -61,7 +61,7 @@ def arguments() -> argparse.Namespace:
 def push_to_huggingface(
     repo_id: str,
     token: str,
-    folder_path: str = "/root/cache",
+    folder_path: str = "/marimo/cache/train",
     repo_type: str = "model",
 ):
     """
