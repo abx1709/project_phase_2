@@ -8,6 +8,7 @@ import sys
 import time
 from pathlib import Path
 from tqdm import tqdm
+from util.tqdm import print_tqdm
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -38,7 +39,7 @@ def arguments() -> argparse.Namespace:
 
 
 def print_section(title: str) -> None:
-    print(f"\n{'=' * 65}\n{title.upper()}\n{'=' * 65}")
+    print_tqdm(f"\n{'=' * 65}\n{title.upper()}\n{'=' * 65}")
 
 
 def move_to_model_device(batch, model):
@@ -193,7 +194,7 @@ def main() -> None:
     started = time.perf_counter()
 
     for epoch in range(args.num_train_epochs):
-        print(f"--- Epoch {epoch + 1}/{args.num_train_epochs} ---")
+        print_tqdm(f"--- Epoch {epoch + 1}/{args.num_train_epochs} ---")
         train_loader = tqdm(loader, desc=f"Training Epoch {epoch + 1}")
         for batch_index, batch in enumerate(train_loader):
             batch = move_to_model_device(batch, model)
@@ -208,44 +209,44 @@ def main() -> None:
                 step += 1
                 step_loss = loss.item() * args.gradient_accumulation_steps
                 losses.append(step_loss)
-                # print(f"[STEP {step}/{args.max_train_steps}] Loss: {step_loss:.4f}")
-                
+                # print_tqdm(f"[STEP {step}/{args.max_train_steps}] Loss: {step_loss:.4f}")
+                print_tqdm(f"[STEP {step}/{args.max_train_steps}] Loss: {step_loss:.4f}")
                 if step >= args.max_train_steps:
                     break
                     
         # --- VALIDATION & CHECKPOINTING ---
-        print("Running validation...")
+        print_tqdm("Running validation...")
         all_val_ans = evaluate_model(model, processor, val_records, args.image_root, args.allow_missing_images, next(model.parameters()).device)
         val_ans = all_val_ans["overall_ans"]
         
-        print(f"Epoch {epoch+1} Validation")
+        print_tqdm(f"Epoch {epoch+1} Validation")
         
         def print_nested(data, indent=1):
             for k, v in data.items():
                 formatted_k = k.replace("_", " ").title()
                 prefix = "\t" * indent
                 if isinstance(v, dict):
-                    print(f"{prefix}{formatted_k}:")
+                    print_tqdm(f"{prefix}{formatted_k}:")
                     print_nested(v, indent + 1)
                 else:
                     val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
-                    print(f"{prefix}{formatted_k}: {val_str}")
+                    print_tqdm(f"{prefix}{formatted_k}: {val_str}")
             if indent == 1:
-                print()
+                print_tqdm()
                 
         def print_non_nested(data):
             for k, v in data.items():
                 formatted_k = k.replace("_", " ").title()
                 val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
-                print(f"{formatted_k}: {val_str}")
-            print()        
+                print_tqdm(f"{formatted_k}: {val_str}")
+            print_tqdm()        
 
         print_non_nested(all_val_ans)
         # print_nested(all_val_ans)
                 
         if val_ans > best_val_ans:
             best_val_ans = val_ans
-            print(f"New best score! Saving adapter to {args.output_dir}")
+            print_tqdm(f"New best score! Saving adapter to {args.output_dir}")
             args.output_dir.mkdir(parents=True, exist_ok=True)
             model.save_pretrained(args.output_dir)
             processor.save_pretrained(args.output_dir)
@@ -267,8 +268,8 @@ def main() -> None:
     }
     (args.output_dir / "training_metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     print_section("Training Complete")
-    print(f"Best Validation ANS: {best_val_ans:.4f}")
-    print(f"Peak VRAM: {peak_vram_gib} GiB")
+    print_tqdm(f"Best Validation ANS: {best_val_ans:.4f}")
+    print_tqdm(f"Peak VRAM: {peak_vram_gib} GiB")
 
 if __name__ == "__main__":
     main()
