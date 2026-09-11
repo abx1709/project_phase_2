@@ -218,6 +218,7 @@ def main() -> None:
         val_ans = all_val_ans["overall_ans"]
         
         print(f"Epoch {epoch+1} Validation")
+        
         def print_nested(data, indent=1):
             for k, v in data.items():
                 formatted_k = k.replace("_", " ").title()
@@ -230,8 +231,16 @@ def main() -> None:
                     print(f"{prefix}{formatted_k}: {val_str}")
             if indent == 1:
                 print()
+                
+        def print_non_nested(data):
+            for k, v in data.items():
+                formatted_k = k.replace("_", " ").title()
+                val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
+                print(f"{formatted_k}: {val_str}")
+            print()        
 
-        print_nested(all_val_ans)
+        print_non_nested(all_val_ans)
+        # print_nested(all_val_ans)
                 
         if val_ans > best_val_ans:
             best_val_ans = val_ans
