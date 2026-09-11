@@ -8,7 +8,6 @@ import sys
 import time
 from pathlib import Path
 from tqdm import tqdm
-from util.tqdm import print_tqdm
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
