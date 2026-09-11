@@ -46,44 +46,103 @@ def move_to_model_device(batch, model):
     device = next(model.parameters()).device
     return {name: tensor.to(device) for name, tensor in batch.items()}
 
-
 def evaluate_model(model, processor, records, image_root, allow_missing, device):
     """Lightweight validation loop for checkpoint selection."""
     import torch
+    from pathlib import Path
     from PIL import Image
+    from tqdm.auto import tqdm
+
     from src.data.vizwiz import build_conversation
     from src.evaluation import vizwiz_ans
-    
+
     model.eval()
     results = []
-    
-    with torch.inference_mode():
-        val_pbar = tqdm(records, desc="Validating", leave=False)
-        for item in val_pbar:
-            try:
-                img_path = Path(image_root) / item["image"]
-                image = Image.open(img_path).convert("RGB")
-                image.thumbnail((448, 448), Image.LANCZOS)
-            except Exception:
-                if not allow_missing:
-                    continue
-                image = Image.new("RGB", (448, 448), color=(0, 0, 0))
-                
-            conv = build_conversation(item["question"], target=None)
-            prompt = processor.apply_chat_template(conv, tokenize=False, add_generation_prompt=True)
-            inputs = processor(text=prompt, images=image, return_tensors="pt").to(device)
-            
-            generated = model.generate(**inputs, max_new_tokens=20, do_sample=False)
-            input_length = inputs["input_ids"].shape[-1]
-            pred = processor.decode(generated[0][input_length:], skip_special_tokens=True).strip()
-            
-            ans = vizwiz_ans(pred, item["answers"])
-            results.append({"ans": ans, "prediction": pred, "answer_type": item.get("answer_type", "other")})
-            
-    model.train()
-    mean_ans = sum(r["ans"] for r in results) / len(results) if results else 0.0
-    return mean_ans
 
+    val_pbar = tqdm(
+        total=len(records),
+        desc="Validating",
+        unit="img",
+        dynamic_ncols=True
+    )
+
+    try:
+        with torch.inference_mode():
+            for item in records:
+                try:
+                    img_path = Path(image_root) / item["image"]
+                    image = Image.open(img_path).convert("RGB")
+                    image.thumbnail((448, 448), Image.LANCZOS)
+
+                except Exception:
+                    if not allow_missing:
+                        val_pbar.update(1)
+                        continue
+
+                    image = Image.new(
+                        "RGB",
+                        (448, 448),
+                        color=(0, 0, 0)
+                    )
+
+                conv = build_conversation(
+                    item["question"],
+                    target=None
+                )
+
+                prompt = processor.apply_chat_template(
+                    conv,
+                    tokenize=False,
+                    add_generation_prompt=True
+                )
+
+                inputs = processor(
+                    text=prompt,
+                    images=image,
+                    return_tensors="pt"
+                ).to(device)
+
+                generated = model.generate(
+                    **inputs,
+                    max_new_tokens=20,
+                    do_sample=False
+                )
+
+                input_length = inputs["input_ids"].shape[-1]
+
+                pred = processor.decode(
+                    generated[0][input_length:],
+                    skip_special_tokens=True
+                ).strip()
+
+                ans = vizwiz_ans(
+                    pred,
+                    item["answers"]
+                )
+
+                results.append({
+                    "ans": ans,
+                    "prediction": pred,
+                    "answer_type": item.get("answer_type", "other")
+                })
+
+                mean_ans = sum(r["ans"] for r in results) / len(results)
+
+                val_pbar.update(1)
+                val_pbar.set_postfix(
+                    ans=f"{mean_ans:.4f}"
+                )
+
+    finally:
+        val_pbar.close()
+        model.train()
+
+    mean_ans = (
+        sum(r["ans"] for r in results) / len(results)
+        if results else 0.0
+    )
+
+    return mean_ans
 
 def main() -> None:
     args = arguments()
@@ -150,7 +209,7 @@ def main() -> None:
                 step += 1
                 step_loss = loss.item() * args.gradient_accumulation_steps
                 losses.append(step_loss)
-                print(f"[STEP {step}/{args.max_train_steps}] Loss: {step_loss:.4f}")
+                # print(f"[STEP {step}/{args.max_train_steps}] Loss: {step_loss:.4f}")
                 
                 if step >= args.max_train_steps:
                     break
