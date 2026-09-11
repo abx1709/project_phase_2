@@ -123,5 +123,50 @@ def main() -> None:
     print(f"Latency (ms/query): {latency_per_query_ms:.2f}")
     print(f"Peak VRAM (GiB): {peak_vram_gib:.3f}")
 
+    # --- 1. Per-Class Metrics Table ---
+    print("\n" + "=" * 78)
+    print(f"{'PER-CLASS METRICS BREAKDOWN':^78}")
+    print("=" * 78)
+    print(f"{'Answer Type':<18} | {'ANS Score':<10} | {'Precision':<10} | {'Recall':<10} | {'F1-Score':<10}")
+    print("-" * 78)
+
+    per_class_ans = metrics.get("per_class_ans", {})
+    per_class_prf = metrics.get("per_class_type_metrics", {})
+    all_classes = sorted(list(set(list(per_class_ans.keys()) + list(per_class_prf.keys()))))
+
+    for cls in all_classes:
+        ans_score = per_class_ans.get(cls, 0.0)
+        prf = per_class_prf.get(cls, {"precision": 0.0, "recall": 0.0, "f1": 0.0})
+        p = prf.get("precision", 0.0)
+        r = prf.get("recall", 0.0)
+        f1 = prf.get("f1", 0.0)
+        print(f"{cls:<18} | {ans_score:<10.4f} | {p:<10.4f} | {r:<10.4f} | {f1:<10.4f}")
+    print("=" * 78)
+
+    # --- 2. Confusion Matrix ---
+    from sklearn.metrics import confusion_matrix
+    from src.evaluation import infer_answer_type
+
+    y_true = [r["answer_type"] for r in results]
+    y_pred = [infer_answer_type(r["prediction"]) for r in results]
+    labels = sorted(list(set(y_true + y_pred)))
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+
+    print("\n" + "=" * 78)
+    print(f"{'CONFUSION MATRIX (Rows: True, Columns: Predicted)':^78}")
+    print("=" * 78)
+    
+    # Print header row with label abbreviations or truncated names
+    col_width = 12
+    header_lbls = [l[:col_width] for l in labels]
+    header = f"{'True \\ Pred':<18} | " + " | ".join([f"{l:<{col_width}}" for l in header_lbls])
+    print(header)
+    print("-" * len(header))
+
+    for i, label in enumerate(labels):
+        row_values = " | ".join([f"{val:<{col_width}}" for val in cm[i]])
+        print(f"{label:<18} | {row_values}")
+    print("=" * 78)
+
 if __name__ == "__main__":
     main()
