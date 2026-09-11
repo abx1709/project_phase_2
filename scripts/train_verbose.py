@@ -46,103 +46,101 @@ def move_to_model_device(batch, model):
     device = next(model.parameters()).device
     return {name: tensor.to(device) for name, tensor in batch.items()}
 
-def evaluate_model(model, processor, records, image_root, allow_missing, device):
-    """Lightweight validation loop for checkpoint selection."""
-    import torch
-    from pathlib import Path
+def load_image(path: Path, allow_missing: bool):
     from PIL import Image
+    try:
+        img = Image.open(path).convert("RGB")
+        img.thumbnail((448, 448), Image.LANCZOS)
+        return img
+    except (FileNotFoundError, OSError) as exc:
+        if allow_missing:
+            return Image.new("RGB", (448, 448), color=(0, 0, 0))
+        raise FileNotFoundError(f"Cannot load {path}") from exc
+
+def evaluate_model(model, processor, records, image_root, allow_missing, device):
+    """Evaluate a checkpoint using the same logic as final evaluation."""
+    import torch
     from tqdm.auto import tqdm
 
     from src.data.vizwiz import build_conversation
-    from src.evaluation import vizwiz_ans
+    from src.evaluation import vizwiz_ans, compute_all_metrics
 
     model.eval()
     results = []
 
-    val_pbar = tqdm(
-        total=len(records),
-        desc="Validating",
+    eval_pbar = tqdm(
+        records,
+        desc="Evaluating",
         unit="img",
-        dynamic_ncols=True
+        dynamic_ncols=True,
     )
 
     try:
         with torch.inference_mode():
-            for item in records:
-                try:
-                    img_path = Path(image_root) / item["image"]
-                    image = Image.open(img_path).convert("RGB")
-                    image.thumbnail((448, 448), Image.LANCZOS)
-
-                except Exception:
-                    if not allow_missing:
-                        val_pbar.update(1)
-                        continue
-
-                    image = Image.new(
-                        "RGB",
-                        (448, 448),
-                        color=(0, 0, 0)
-                    )
+            for item in eval_pbar:
+                image = load_image(
+                    image_root / item["image"],
+                    allow_missing,
+                )
 
                 conv = build_conversation(
                     item["question"],
-                    target=None
+                    target=None,
                 )
 
                 prompt = processor.apply_chat_template(
                     conv,
                     tokenize=False,
-                    add_generation_prompt=True
+                    add_generation_prompt=True,
                 )
 
                 inputs = processor(
                     text=prompt,
                     images=image,
-                    return_tensors="pt"
+                    return_tensors="pt",
                 ).to(device)
 
                 generated = model.generate(
                     **inputs,
                     max_new_tokens=20,
-                    do_sample=False
+                    do_sample=False,
                 )
 
                 input_length = inputs["input_ids"].shape[-1]
 
-                pred = processor.decode(
+                prediction = processor.decode(
                     generated[0][input_length:],
-                    skip_special_tokens=True
+                    skip_special_tokens=True,
                 ).strip()
 
-                ans = vizwiz_ans(
-                    pred,
-                    item["answers"]
-                )
-
                 results.append({
-                    "ans": ans,
-                    "prediction": pred,
-                    "answer_type": item.get("answer_type", "other")
+                    "prediction": prediction,
+                    "references": item["answers"],
+                    "ans": vizwiz_ans(
+                        prediction,
+                        item["answers"],
+                    ),
+                    "answer_type": item.get(
+                        "answer_type",
+                        "other",
+                    ),
                 })
 
-                mean_ans = sum(r["ans"] for r in results) / len(results)
+                mean_ans = sum(
+                    r["ans"] for r in results
+                ) / len(results)
 
-                val_pbar.update(1)
-                val_pbar.set_postfix(
+                eval_pbar.set_postfix(
                     ans=f"{mean_ans:.4f}"
                 )
 
     finally:
-        val_pbar.close()
+        eval_pbar.close()
         model.train()
 
-    mean_ans = (
-        sum(r["ans"] for r in results) / len(results)
-        if results else 0.0
-    )
+    metrics = compute_all_metrics(results)
 
-    return mean_ans
+    return metrics["overall_ans"]
 
 def main() -> None:
     args = arguments()
