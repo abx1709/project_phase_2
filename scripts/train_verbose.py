@@ -218,9 +218,15 @@ def main() -> None:
         val_ans = all_val_ans["overall_ans"]
         print(f"Epoch {epoch+1} Validation")
         for k, v in all_val_ans.items():
-            k = k.replace("_", " ").title()
-            print(f"{k}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}")
-        
+            formatted_k = k.replace("_", " ").title()
+            if not isinstance(v, dict):
+                print(f"\t{formatted_k}: {v:.4f}" if isinstance(v, float) else f"\t{formatted_k}: {v}")
+            else:
+                print(f"\t{formatted_k}:\n")
+                for k2, v2 in v.items():
+                    formatted_k2 = k2.replace("_", " ").title()
+                    print(f"\t\t{formatted_k2}: {v2:.4f}" if isinstance(v2, float) else f"\t\t{formatted_k2}: {v2}")
+                
         if val_ans > best_val_ans:
             best_val_ans = val_ans
             print(f"New best score! Saving adapter to {args.output_dir}")
