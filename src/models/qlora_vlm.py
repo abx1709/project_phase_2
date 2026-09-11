@@ -82,6 +82,16 @@ def load_quantized_vlm(
                 task_type="CAUSAL_LM",
             )
             model = get_peft_model(model, peft_config)
+            
+            # EXPERIMENT B: Explicitly unfreeze the visual merger for noise adaptation
+            for name, param in model.named_parameters():
+                if "visual.merger" in name:
+                    # FIX: If the param is quantized (uint8), dequantize to float32
+                    # so PyTorch allows gradient computation.
+                    if not param.is_floating_point():
+                        param.data = param.data.to(torch.float32)
+                    param.requires_grad = True
+                    
             pbar.update(2)
         else:
             pbar.update(2)
