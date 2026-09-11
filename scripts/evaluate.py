@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-def arguments() -> argparse.Namespace:
+def arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model-id", default="Qwen/Qwen2-VL-7B-Instruct")
     parser.add_argument("--adapter-path", type=Path, required=True)
@@ -34,14 +34,13 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--fp16", action="store_true")
     parser.add_argument("--num-eval-samples", type=int, default=-1)
     
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def load_image(path: Path, allow_missing: bool):
     from PIL import Image
     try:
         img = Image.open(path).convert("RGB")
-        # EXPERIMENT A: Remove 448 cap for evaluation.
         img.thumbnail((2048, 2048), Image.LANCZOS)
         return img
     except (FileNotFoundError, OSError) as exc:
@@ -50,8 +49,8 @@ def load_image(path: Path, allow_missing: bool):
         raise FileNotFoundError(f"Cannot load {path}") from exc
 
 
-def main() -> None:
-    args = arguments()
+def main(argv: list[str] | None = None) -> None:
+    args = arguments(argv)
     import torch
     from src.data.vizwiz import build_conversation, prepare_records
     from src.evaluation import vizwiz_ans, compute_all_metrics, infer_answer_type
