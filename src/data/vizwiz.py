@@ -11,6 +11,7 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
+import random
 
 def _cache_key(dataset_path: Path, limit: int, split: str) -> str:
     stat = dataset_path.stat()
@@ -37,7 +38,6 @@ def build_conversation(question: str, target: str | None = None):
         messages.append({"role": "assistant", "content": target})
     return messages
 
-
 def prepare_records(dataset_path: Path, cache_dir: Path, limit: int, split: str) -> list[dict[str, Any]]:
     cache_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{split}_{_cache_key(dataset_path, limit, split)}"
@@ -47,9 +47,12 @@ def prepare_records(dataset_path: Path, cache_dir: Path, limit: int, split: str)
 
     raw = json.loads(dataset_path.read_text(encoding="utf-8"))
     
-    # FIX: STRICTLY FILTER BY SPLIT FIRST
+    # STRICTLY FILTER BY SPLIT FIRST
     if split != "all":
         raw = [item for item in raw if item.get("split") == split]
+    
+    # SHUFFLE AFTER FILTERING, BEFORE LIMITING
+    random.shuffle(raw)
     
     # THEN APPLY LIMIT
     if limit is not None and limit > 0:
@@ -70,7 +73,6 @@ def prepare_records(dataset_path: Path, cache_dir: Path, limit: int, split: str)
         })
     prepared_path.write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
     return records
-
 
 class VizWizHindiDataset(Dataset):
     def __init__(self, records: list[dict[str, Any]], image_root: Path, allow_missing_images: bool = False):
