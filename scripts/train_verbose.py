@@ -170,21 +170,27 @@ def main() -> None:
         QLoRASettings(model_id=args.model_id, use_4bit=args.use_4bit, use_bf16=not args.fp16),
         trainable=True
     )
+    tqdm.write(f"Model loaded on device: {next(model.parameters()).device}")
 
     train_set = VizWizHindiDataset(train_records, args.image_root, args.allow_missing_images)
+    tqdm.write(f"Training dataset size: {len(train_set)} samples.")
     loader = DataLoader(
         train_set,
         batch_size=args.per_device_train_batch_size,
         shuffle=True,
         collate_fn=LlavaDataCollator(processor),
     )
+    tqdm.write(f"Training DataLoader created with batch size {args.per_device_train_batch_size}.")
 
     optimizer = AdamW((p for p in model.parameters() if p.requires_grad), lr=args.learning_rate)
+    tqdm.write(f"Optimizer initialized with learning rate {args.learning_rate}.")
 
     if args.max_train_steps <= 0:
         args.max_train_steps = (len(train_records) // (args.per_device_train_batch_size * args.gradient_accumulation_steps)) + 1
-        if args.multiply_max_train_steps:
-            args.max_train_steps *= args.num_train_epochs
+    if args.multiply_max_train_steps:
+        args.max_train_steps *= args.num_train_epochs
+            
+    tqdm.write("")
 
     print_section("Training Loop Started")
     model.train()
