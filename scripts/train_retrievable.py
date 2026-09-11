@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import shutil
 import sys
@@ -420,7 +421,8 @@ def main() -> None:
                     if args.push_to_hf_every > 0 and step % args.push_to_hf_every == 0:
                         url = push_to_huggingface(repo_id=args.hf_repo_id, token=args.hf_token)
                         # tqdm.ascii.write(f"Checkpoint pushed to Hugging Face Hub: {url}")
-                        with open(args.output_dir / f"last_push_urls / last_push_url_{datetime.now()}.txt", "w", encoding="utf-8") as f:
+                        os.makedirs(args.output_dir / f"last_push_urls", exist_ok=True)
+                        with open(args.output_dir / "last_push_urls" / f"last_push_url_{datetime.now()}.txt", "w", encoding="utf-8") as f:
                             f.write(url)
 
                     if step >= args.max_train_steps:

@@ -43,6 +43,8 @@ htmlcov/
 *.bin
 *.safetensors
 
+cache_backup/trainer_state.pt
+
 # Hugging Face cache
 .cache/
 huggingface_cache/
