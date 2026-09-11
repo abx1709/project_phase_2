@@ -216,16 +216,22 @@ def main() -> None:
         print("Running validation...")
         all_val_ans = evaluate_model(model, processor, val_records, args.image_root, args.allow_missing_images, next(model.parameters()).device)
         val_ans = all_val_ans["overall_ans"]
+        
         print(f"Epoch {epoch+1} Validation")
-        for k, v in all_val_ans.items():
-            formatted_k = k.replace("_", " ").title()
-            if not isinstance(v, dict):
-                print(f"\t{formatted_k}: {v:.4f}" if isinstance(v, float) else f"\t{formatted_k}: {v}")
-            else:
-                print(f"\t{formatted_k}:\n")
-                for k2, v2 in v.items():
-                    formatted_k2 = k2.replace("_", " ").title()
-                    print(f"\t\t{formatted_k2}: {v2:.4f}" if isinstance(v2, float) else f"\t\t{formatted_k2}: {v2}")
+        def print_nested(data, indent=1):
+            for k, v in data.items():
+                formatted_k = k.replace("_", " ").title()
+                prefix = "\t" * indent
+                if isinstance(v, dict):
+                    print(f"{prefix}{formatted_k}:")
+                    print_nested(v, indent + 1)
+                else:
+                    val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
+                    print(f"{prefix}{formatted_k}: {val_str}")
+            if indent == 1:
+                print()
+
+        print_nested(all_val_ans)
                 
         if val_ans > best_val_ans:
             best_val_ans = val_ans
