@@ -59,6 +59,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--fresh", action="store_true", help="Ignore cached resume state and start over.")
     return parser.parse_args()
 
+from huggingface_hub.utils import disable_progress_bars
+
 def push_to_huggingface(
     repo_id: str,
     token: str,
@@ -66,27 +68,20 @@ def push_to_huggingface(
     repo_type: str = "model",
 ):
     """
-    Upload a local folder to a Hugging Face Hub repository.
-
-    Args:
-        repo_id: Hugging Face repo, e.g. "username/my-model"
-        token: Hugging Face access token
-        folder_path: Local folder to upload
-        repo_type: "model", "dataset", or "space"
+    Upload a local folder to a Hugging Face Hub repository
+    without printing output or showing progress bars.
     """
-    
     try:
+        disable_progress_bars()
 
         api = HfApi(token=token)
 
-        # Create the repository if it doesn't already exist
         api.create_repo(
             repo_id=repo_id,
             repo_type=repo_type,
             exist_ok=True,
         )
 
-        # Upload the folder
         upload_folder(
             repo_id=repo_id,
             folder_path=folder_path,
@@ -95,7 +90,7 @@ def push_to_huggingface(
         )
 
         return f"https://huggingface.co/{repo_id}"
-    
+
     except Exception as e:
         return f"[ERROR] uploading to Hugging Face Hub: {e}"
 
