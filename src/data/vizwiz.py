@@ -88,8 +88,8 @@ class VizWizHindiDataset(Dataset):
         path = self.image_root / item["image"]
         try:
             image = Image.open(path).convert("RGB")
-            max_size = 448  # Increased to 448 for better VLM accuracy
-            image.thumbnail((max_size, max_size), Image.LANCZOS)
+            # EXPERIMENT A: Remove 448 cap. Let processor handle dynamic resolution up to 1024x1024.
+            image.thumbnail((2048, 2048), Image.LANCZOS)
         except (FileNotFoundError, OSError) as exc:
             if not self.allow_missing_images:
                 raise FileNotFoundError(
@@ -128,8 +128,9 @@ class LlavaDataCollator:
             user_text = self.processor.apply_chat_template(
                 user_conv, tokenize=False, add_generation_prompt=True
             )
-            user_ids = self.processor.tokenizer(user_text, add_special_tokens=True)["input_ids"]
-            user_len = len(user_ids)
+            # FIX: Process text AND image together to get the true expanded sequence length
+            user_inputs = self.processor(text=[user_text], images=[ex["image_data"]], return_tensors="pt")
+            user_len = user_inputs["input_ids"].shape[-1]
             labels[i, :user_len] = -100
 
         batch["labels"] = labels

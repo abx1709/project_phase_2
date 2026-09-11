@@ -49,7 +49,8 @@ def load_image(path: Path, allow_missing: bool):
     from PIL import Image
     try:
         img = Image.open(path).convert("RGB")
-        img.thumbnail((448, 448), Image.LANCZOS)
+        # EXPERIMENT A: Remove 448 cap for evaluation.
+        img.thumbnail((2048, 2048), Image.LANCZOS)
         return img
     except (FileNotFoundError, OSError) as exc:
         if allow_missing:

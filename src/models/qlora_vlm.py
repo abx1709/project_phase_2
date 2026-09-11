@@ -28,6 +28,10 @@ def load_quantized_vlm(
             adapter_path if adapter_path and Path(adapter_path).exists() else settings.model_id,
             trust_remote_code=settings.trust_remote_code,
         )
+        
+        # EXPERIMENT A: Enable Dynamic Resolution up to 1024x1024 pixels (1024 tokens)
+        processor.image_processor.min_pixels = 256 * 28 * 28
+        processor.image_processor.max_pixels = 1024 * 28 * 28
         pbar.update(1)
 
         compute_dtype = torch.bfloat16 if settings.use_bf16 else torch.float16
