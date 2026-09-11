@@ -37,7 +37,7 @@ htmlcov/
 # ==============================
 # ML Models / Checkpoints
 # ==============================
-# *.pt
+*.pt
 *.pth
 *.ckpt
 *.bin
