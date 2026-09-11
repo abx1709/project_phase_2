@@ -71,8 +71,12 @@ def load_quantized_vlm(
 
             if hasattr(model, "gradient_checkpointing_enable"):
                 model.gradient_checkpointing_enable()
-
-            target_modules = ["q_proj", "v_proj", "k_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+            
+            target_modules = [
+                "q_proj", "v_proj", "k_proj", "o_proj", 
+                "gate_proj", "up_proj", "down_proj",
+                "fc1", "fc2"  # EXPERIMENT B: Visual Merger & ViT MLPs
+            ]
             peft_config = LoraConfig(
                 r=8,
                 lora_alpha=16,
@@ -82,18 +86,6 @@ def load_quantized_vlm(
                 task_type="CAUSAL_LM",
             )
             model = get_peft_model(model, peft_config)
-            
-            # EXPERIMENT B: Explicitly unfreeze the visual merger for noise adaptation
-            for name, param in model.named_parameters():
-                if "visual.merger" in name:
-                    # FIX: If the param is quantized (uint8), dequantize to float32
-                    # so PyTorch allows gradient computation.
-                    if not param.is_floating_point():
-                        param.data = param.data.to(torch.float32)
-                    param.requires_grad = True
-                    
-            pbar.update(2)
-        else:
             pbar.update(2)
 
     return model, processor, compute_dtype
