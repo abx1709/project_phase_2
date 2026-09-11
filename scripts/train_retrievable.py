@@ -21,6 +21,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from huggingface_hub import HfApi, upload_folder
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -47,10 +49,54 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--allow-missing-images", action="store_true")
     parser.add_argument("--use-4bit", action="store_true")
     parser.add_argument("--fp16", action="store_true")
+    parser.add_argument("--hf-repo-id", type=str, default=None, help="Hugging Face Hub repo to push to (must be writable).")
+    parser.add_argument("--hf-token", type=str, default=None, help="Hugging Face Hub access token (or set HF_TOKEN env var).")
     parser.add_argument("--seed", type=int, default=0, help="Base seed for per-epoch shuffle (must stay fixed across resumes).")
     parser.add_argument("--resume-every", type=int, default=13, help="Optimizer steps between resume saves (kill loses at most this many).")
+    parser.add_argument("--push-to-hf-every", type=int, default=0, help="Optimizer steps between pushing to Hugging Face Hub (0 disables).")
     parser.add_argument("--fresh", action="store_true", help="Ignore cached resume state and start over.")
     return parser.parse_args()
+
+def push_to_huggingface(
+    repo_id: str,
+    token: str,
+    folder_path: str = "/root/cache",
+    repo_type: str = "model",
+):
+    """
+    Upload a local folder to a Hugging Face Hub repository.
+
+    Args:
+        repo_id: Hugging Face repo, e.g. "username/my-model"
+        token: Hugging Face access token
+        folder_path: Local folder to upload
+        repo_type: "model", "dataset", or "space"
+    """
+    
+    try:
+
+        api = HfApi(token=token)
+
+        # Create the repository if it doesn't already exist
+        api.create_repo(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            exist_ok=True,
+        )
+
+        # Upload the folder
+        upload_folder(
+            repo_id=repo_id,
+            folder_path=folder_path,
+            repo_type=repo_type,
+            token=token,
+        )
+
+        return f"https://huggingface.co/{repo_id}"
+    
+    except Exception as e:
+        print(f"Error uploading to Hugging Face Hub: {e}")
+        return None
 
 
 def print_section(title: str) -> None:
@@ -367,6 +413,14 @@ def main() -> None:
                     # Periodic resume save: any kill loses at most --resume-every steps.
                     if step % args.resume_every == 0:
                         save_resume(model, optimizer, resume_dir, resume_state(epoch, batches_done))
+                        
+                    args.push_to_hf_every = min(args.push_to_hf_every, args.resume_every)  # don't push more often than we save
+                        
+                    if args.push_to_hf_every > 0 and step % args.push_to_hf_every == 0:
+                        url = push_to_huggingface(repo_id=args.hf_repo_id, token=args.hf_token)
+                        # tqdm.ascii.write(f"Checkpoint pushed to Hugging Face Hub: {url}")
+                        with open(args.output_dir / "last_push_url.txt", "w", encoding="utf-8") as f:
+                            f.write(url)
 
                     if step >= args.max_train_steps:
                         break
@@ -440,7 +494,7 @@ def main() -> None:
         "elapsed_seconds": round(time.perf_counter() - started, 3),
         "peak_vram_gib": peak_vram_gib,
     }
-    (args.output_dir / "training_metrics.json").wrsite_text(json.dumps(metrics, indent=2), encoding="utf-8")
+    (args.output_dir / "training_metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     print_section("Training Complete")
     tqdm.write(f"Best Validation ANS: {best_val_ans:.4f}")
     tqdm.write(f"Peak VRAM: {peak_vram_gib} GiB")
